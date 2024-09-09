@@ -8,6 +8,7 @@ ALUNOS:
 
 '''
 1 - Bibliotecas necessárias: 
+traceback: indicada pelo professor
 
 '''
 
@@ -54,40 +55,48 @@ class CamadaEnlace:
 
 class Enlace:
     def __init__(self, linha_serial):
-        self.dados = b''
-        self.linha_serial = linha_serial
-        self.linha_serial.registrar_recebedor(self.__raw_recv)
+        # Inicializa a classe Enlace com a linha serial fornecida
+        self.dados = b''  # Armazena os dados recebidos
+        self.linha_serial = linha_serial  # Referência para a linha serial
+        self.linha_serial.registrar_recebedor(self.__raw_recv)  # Registra o método de recebimento
 
     def registrar_recebedor(self, callback):
+        # Registra a função callback para processar datagramas recebidos
         self.callback = callback
 
     def enviar(self, datagrama):
-        datagrama_codif = datagrama.replace(b'\xDB', b'\xDB\xDD').replace(b'\xC0', b'\xDB\xDC')
-        datagrama_codif = b'\xC0' + datagrama_codif + b'\xC0'
-        self.linha_serial.enviar(datagrama_codif)
+        # Passo 1: Adiciona bytes de delimitação no início e no fim do datagrama
+        # Passo 2: Implementa as sequências de escape para bytes especiais
+        datagrama_codif = datagrama.replace(b'\xDB', b'\xDB\xDD').replace(b'\xC0', b'\xDB\xDC')  # Trata as sequências de escape
+        datagrama_codif = b'\xC0' + datagrama_codif + b'\xC0'  # Adiciona o byte de início e fim (0xC0)
+        self.linha_serial.enviar(datagrama_codif)  # Envia o datagrama codificado pela linha serial
         pass
 
     def __raw_recv(self, dados):
+        # Passo 3: Implementa a recepção de dados
         if not hasattr(self, 'dados'):
-            self.dados = b''
-        self.dados += dados
+            self.dados = b''  # Inicializa os dados se ainda não estiverem definidos
+        self.dados += dados  # Acrescenta os dados recebidos ao buffer
 
         while self.dados:
-            end = self.dados.find(b'\xC0')
+            end = self.dados.find(b'\xC0')  # Procura pelo delimitador de fim de quadro (0xC0)
             if end != -1:
-                pedaco = self.dados[:end]
+                pedaco = self.dados[:end]  # Extrai o quadro até o delimitador
                 if len(pedaco) > 0:
-                    pedaco = pedaco.replace(b'\xDB\xDC', b'\xC0').replace(b'\xDB\xDD', b'\xDB')
+                    # Passo 4: Lida com as sequências de escape para bytes especiais
+                    pedaco = pedaco.replace(b'\xDB\xDC', b'\xC0').replace(b'\xDB\xDD', b'\xDB')  # Reverte as sequências de escape
                     try:
+                        # Passo 3 e 5: Chama o callback para processar o datagrama
                         self.callback(pedaco)
                     except:
-                        # ignora a exceção, mas mostra na tela
+                        # Passo 5: Trata exceções, mostrando o erro e evitando que dados malformados sejam repassados
                         import traceback
                         traceback.print_exc()
                     finally:
-                        # faça aqui a limpeza necessária para garantir que não vão sobrar
-                        # pedaços do datagrama em nenhum buffer mantido por você
+                        # Passo 5: Limpa dados residuais para evitar processamento futuro de datagramas malformados
                         pass
-                self.dados = self.dados[end +1:]
+                # Remove o quadro processado do buffer
+                self.dados = self.dados[end + 1:]
             else:
-                break
+                break  # Sai do loop se nenhum delimitador de quadro for encontrado
+
